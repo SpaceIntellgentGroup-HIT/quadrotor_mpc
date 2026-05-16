@@ -1,0 +1,31 @@
+mass: 1.535
+hover_thrust: 0.62
+takeoff_height: 3.5
+ctrl_hz: 100
+odomTopicName: /odom
+
+boundings:
+  T_max: 25
+  T_min: 2
+  wx_max: 2.0
+  wx_min: -2.0
+  wy_max: 2.0
+  wy_min: -2.0
+  wz_max: 2.0
+  wz_min: -2.0
+
+cost:
+  cost_px: 100
+  cost_py: 100
+  cost_pz: 100
+  cost_qw: 100
+  cost_qx: 100
+  cost_qy: 100
+  cost_qz: 100
+  cost_vx: 30
+  cost_vy: 30
+  cost_vz: 30
+  cost_thrust: 30
+  cost_wx: 30
+  cost_wy: 30
+  cost_wz: 30
