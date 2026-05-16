@@ -291,7 +291,10 @@ bool MPCRos::reachgoal(nav_msgs::Odometry& msg, Eigen::Vector3f& goal)
   double distance;
   distance = (msg.pose.pose.position.x - goal[0]) * (msg.pose.pose.position.x - goal[0]) + 
              (msg.pose.pose.position.y - goal[1]) * (msg.pose.pose.position.y - goal[1]) + 
-             (msg.pose.pose.position.z - goal[2] + 1) * (msg.pose.pose.position.z - goal[2] + 1);
+             (msg.pose.pose.position.z - goal[2]) * (msg.pose.pose.position.z - goal[2]);
+  // distance = (msg.pose.pose.position.x - goal[0]) * (msg.pose.pose.position.x - goal[0]) + 
+  //            (msg.pose.pose.position.y - goal[1]) * (msg.pose.pose.position.y - goal[1]) + 
+  //            (msg.pose.pose.position.z - goal[2] + 1) * (msg.pose.pose.position.z - goal[2] + 1);
 
   if(distance < 0.08) 
   {

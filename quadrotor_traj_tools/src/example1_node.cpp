@@ -128,9 +128,9 @@ int main(int argc, char **argv)
     d0 = d1 = 0.0;
     // route = routeGen.generate(3);
     route = Eigen::MatrixXd::Zero(3, 4);
-    route << 0, 3, 6, 9,
-             0, 0, 0, 0,
-             3.5, 3.5, 3.5, 3.5;
+    route << 0, 2, 0, 2,
+             0, 2, 0, -2,
+             1.5, 1.5, 1.5, 1.5;
 
     iS.col(0) << route.leftCols<1>();
     fS.col(0) << route.rightCols<1>();

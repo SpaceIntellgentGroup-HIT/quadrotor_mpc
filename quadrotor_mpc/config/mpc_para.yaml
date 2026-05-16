@@ -1,6 +1,6 @@
 mass: 1.535
 hover_thrust: 0.62
-takeoff_height: 3.5
+takeoff_height: 1.5
 ctrl_hz: 100
 odomTopicName: /odom
 
