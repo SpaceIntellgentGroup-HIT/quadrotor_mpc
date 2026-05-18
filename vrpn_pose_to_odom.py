@@ -18,10 +18,16 @@ class VrpnPoseToOdometry:
         self.pos_offset_z = float(rospy.get_param("~pos_offset_z", 0.0))
 
         self.filter_tau = float(rospy.get_param("~filter_tau", 0.01))
+        self.velocity_filter_tau = float(rospy.get_param("~velocity_filter_tau", 0.05))
+        self.min_dt = float(rospy.get_param("~min_dt", 1.0e-4))
+        self.max_dt = float(rospy.get_param("~max_dt", 0.2))
+        self.max_velocity = float(rospy.get_param("~max_velocity", 5.0))
 
         self._last_stamp = None
+        self._last_raw_pos = None
         self._filt_pos = None
         self._filt_quat = None
+        self._filt_vel = (0.0, 0.0, 0.0)
 
         self.odom_pub = rospy.Publisher(self.odom_topic, Odometry, queue_size=10)
         self.pose_sub = rospy.Subscriber(self.pose_topic, PoseStamped, self.pose_callback, queue_size=20)
@@ -29,44 +35,70 @@ class VrpnPoseToOdometry:
         rospy.loginfo("VrpnPoseToOdometry started")
         rospy.loginfo("  pose_topic: %s", self.pose_topic)
         rospy.loginfo("  odom_topic: %s", self.odom_topic)
+        rospy.loginfo("  filter_tau: %.3f", self.filter_tau)
+        rospy.loginfo("  velocity_filter_tau: %.3f", self.velocity_filter_tau)
 
     def pose_callback(self, msg: PoseStamped):
         stamp = msg.header.stamp if msg.header.stamp != rospy.Time() else rospy.Time.now()
         pos = msg.pose.position
-        x = pos.x + self.pos_offset_x
-        y = pos.y + self.pos_offset_y
-        z = pos.z + self.pos_offset_z
+        raw_pos = (
+            pos.x + self.pos_offset_x,
+            pos.y + self.pos_offset_y,
+            pos.z + self.pos_offset_z,
+        )
 
-        raw_quat = (
+        raw_quat = self._quat_normalize((
             msg.pose.orientation.x,
             msg.pose.orientation.y,
             msg.pose.orientation.z,
             msg.pose.orientation.w,
-        )
+        ))
 
-        alpha = 1.0
-        if self._last_stamp is not None and self.filter_tau > 0.0:
+        dt = None
+        reset_filter = False
+        if self._last_stamp is not None:
             dt = (stamp - self._last_stamp).to_sec()
-            if dt < 0.0:
-                dt = 0.0
-            if dt > 0.0:
-                alpha = dt / (self.filter_tau + dt)
-            else:
-                alpha = 0.0
-        alpha = 1.0
+            if dt < -self.min_dt:
+                rospy.logwarn_throttle(
+                    1.0,
+                    "VRPN timestamp moved backwards by %.6f s; resetting odom filter",
+                    -dt,
+                )
+                reset_filter = True
+            elif dt > self.max_dt:
+                rospy.logwarn_throttle(
+                    1.0,
+                    "VRPN timestamp gap %.6f s is too large; resetting odom velocity",
+                    dt,
+                )
+                reset_filter = True
+
         if self._filt_pos is None or self._filt_quat is None:
-            self._filt_pos = (x, y, z)
+            self._filt_pos = raw_pos
             self._filt_quat = raw_quat
+            self._filt_vel = (0.0, 0.0, 0.0)
+        elif reset_filter:
+            self._filt_pos = raw_pos
+            self._filt_quat = raw_quat
+            self._filt_vel = (0.0, 0.0, 0.0)
         else:
-            fx, fy, fz = self._filt_pos
-            self._filt_pos = (
-                fx + alpha * (x - fx),
-                fy + alpha * (y - fy),
-                fz + alpha * (z - fz),
-            )
-            self._filt_quat = self._quat_nlerp(self._filt_quat, raw_quat, alpha)
+            if dt is not None and dt > self.min_dt:
+                alpha = self._filter_alpha(dt, self.filter_tau)
+                self._filt_pos = self._lowpass_vector(self._filt_pos, raw_pos, alpha)
+                self._filt_quat = self._quat_nlerp(self._filt_quat, raw_quat, alpha)
+
+                if self._last_raw_pos is not None:
+                    raw_vel = tuple(
+                        (raw_pos[i] - self._last_raw_pos[i]) / dt for i in range(3)
+                    )
+                    raw_vel = self._limit_vector(raw_vel, self.max_velocity)
+                    vel_alpha = self._filter_alpha(dt, self.velocity_filter_tau)
+                    self._filt_vel = self._lowpass_vector(
+                        self._filt_vel, raw_vel, vel_alpha
+                    )
 
         self._last_stamp = stamp
+        self._last_raw_pos = raw_pos
 
         odom = Odometry()
         odom.header.stamp = stamp
@@ -76,7 +108,6 @@ class VrpnPoseToOdometry:
             odom.header.frame_id = msg.header.frame_id if msg.header.frame_id else "odom"
         odom.child_frame_id = self.child_frame
 
-        odom.pose.pose = msg.pose
         odom.pose.pose.position.x = self._filt_pos[0]
         odom.pose.pose.position.y = self._filt_pos[1]
         odom.pose.pose.position.z = self._filt_pos[2]
@@ -84,8 +115,35 @@ class VrpnPoseToOdometry:
         odom.pose.pose.orientation.y = self._filt_quat[1]
         odom.pose.pose.orientation.z = self._filt_quat[2]
         odom.pose.pose.orientation.w = self._filt_quat[3]
+        odom.twist.twist.linear.x = self._filt_vel[0]
+        odom.twist.twist.linear.y = self._filt_vel[1]
+        odom.twist.twist.linear.z = self._filt_vel[2]
 
         self.odom_pub.publish(odom)
+
+    @staticmethod
+    def _filter_alpha(dt, tau):
+        if dt <= 0.0:
+            return 0.0
+        if tau <= 0.0:
+            return 1.0
+        return dt / (tau + dt)
+
+    @staticmethod
+    def _lowpass_vector(old_value, new_value, alpha):
+        return tuple(
+            old_value[i] + alpha * (new_value[i] - old_value[i]) for i in range(3)
+        )
+
+    @staticmethod
+    def _limit_vector(value, max_norm):
+        if max_norm <= 0.0:
+            return value
+        norm = (value[0] * value[0] + value[1] * value[1] + value[2] * value[2]) ** 0.5
+        if norm <= max_norm:
+            return value
+        scale = max_norm / norm
+        return (value[0] * scale, value[1] * scale, value[2] * scale)
 
     @staticmethod
     def _quat_norm(q):
