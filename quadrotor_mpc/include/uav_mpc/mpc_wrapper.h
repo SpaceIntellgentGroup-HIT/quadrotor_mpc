@@ -9,8 +9,10 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PointStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Float32MultiArray.h>
 // ACADO
 #include "acado_common.h"
 #include "acado_auxiliary_functions.h"
@@ -46,6 +48,12 @@ class MPCWrapper
     acado_timer t;
 
     void updateState(nav_msgs::Odometry& msg);
+    void publishDebugData();
+
+    ros::Publisher pub_pred_path;
+    ros::Publisher pub_ref_path;
+    ros::Publisher pub_pred_u;
+    ros::Publisher pub_x0;
 
   public:
     MPCWrapper(ros::NodeHandle &nh);

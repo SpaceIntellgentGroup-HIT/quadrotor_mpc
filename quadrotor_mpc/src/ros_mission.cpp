@@ -30,6 +30,9 @@ void MPCRos::ExectControl()
   state_sub = nh.subscribe<mavros_msgs::State> ("/mavros/state", 10, &MPCRos::state_Callback, this);
   traj_sub = nh.subscribe<quadrotor_msgs::mpc_ref_traj> ("/mpc_ref_traj", 1, &MPCRos::traj_Callback, this);
   cmd_pub = nh.advertise<mavros_msgs::AttitudeTarget> ("/mavros/setpoint_raw/attitude", 1);
+  debug_mode_pub = nh.advertise<std_msgs::Int8>("/mpc_debug/mode", 1);
+  debug_ref_pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/mpc_debug/ref_pose", 1);
+  debug_control_pub = nh.advertise<std_msgs::Float32MultiArray>("/mpc_debug/raw_control", 1);
 
   offb_set_mode.request.custom_mode = "OFFBOARD";
   arm_cmd.request.value = true;
@@ -307,6 +310,32 @@ bool MPCRos::reachgoal(nav_msgs::Odometry& msg, Eigen::Vector3f& goal)
 
 void MPCRos::publishcontrol()
 {
+  // 1. Publish MPC Mode (0: Takeoff, 1: Hover, 2: Tracking)
+  std_msgs::Int8 mode_msg;
+  mode_msg.data = mpc_mode;
+  debug_mode_pub.publish(mode_msg);
+
+  // 2. Publish Current Reference Pose (Horizon Step 0)
+  geometry_msgs::PoseStamped ref_pose;
+  ref_pose.header.stamp = ros::Time::now();
+  ref_pose.header.frame_id = "world"; 
+  ref_pose.pose.position.x = reference(0, 0);
+  ref_pose.pose.position.y = reference(1, 0);
+  ref_pose.pose.position.z = reference(2, 0);
+  ref_pose.pose.orientation.w = reference(3, 0);
+  ref_pose.pose.orientation.x = reference(4, 0);
+  ref_pose.pose.orientation.y = reference(5, 0);
+  ref_pose.pose.orientation.z = reference(6, 0);
+  debug_ref_pose_pub.publish(ref_pose);
+
+  // 3. Publish Raw Control Outputs from MPC
+  std_msgs::Float32MultiArray ctrl_msg;
+  ctrl_msg.data.push_back(control[0]); // thrust
+  ctrl_msg.data.push_back(control[1]); // wx
+  ctrl_msg.data.push_back(control[2]); // wy
+  ctrl_msg.data.push_back(control[3]); // wz
+  debug_control_pub.publish(ctrl_msg);
+
   double thrust = control[0] * hover_thrust / 9.8066;
 
   mavros_msgs::AttitudeTarget cmd;

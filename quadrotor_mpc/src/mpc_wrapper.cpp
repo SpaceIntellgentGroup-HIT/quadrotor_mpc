@@ -28,6 +28,11 @@ MPCWrapper::MPCWrapper(ros::NodeHandle &nh):nh(nh)
   nh.getParam("/boudings/wy_min", wy_min); 
   nh.getParam("/boudings/wz_max", wz_max); 
   nh.getParam("/boudings/wz_min", wz_min); 
+
+  pub_pred_path = nh.advertise<nav_msgs::Path>("/mpc_debug/acado_pred_path", 1);
+  pub_ref_path = nh.advertise<nav_msgs::Path>("/mpc_debug/acado_ref_path", 1);
+  pub_pred_u = nh.advertise<std_msgs::Float32MultiArray>("/mpc_debug/acado_pred_u", 1);
+  pub_x0 = nh.advertise<std_msgs::Float32MultiArray>("/mpc_debug/acado_x0", 1);
 }
 
 MPCWrapper::~MPCWrapper()
@@ -153,6 +158,8 @@ bool MPCWrapper::getSolution(nav_msgs::Odometry& msg, Eigen::Vector4f& control)
 	  return 0;
   }
 
+  publishDebugData();
+
 	// acado_printDifferentialVariables();
 	// acado_printControlVariables();
 
@@ -181,6 +188,70 @@ bool MPCWrapper::getSolution(nav_msgs::Odometry& msg, Eigen::Vector4f& control)
 	   printf("\n\n Average time of one real-time iteration:   %f milliseconds\n\n", 1e3 * te );
   
   return true;
+}
+
+void MPCWrapper::publishDebugData()
+{
+  ros::Time now = ros::Time::now();
+
+  // 1. Publish x0 (Current State Input to MPC)
+  std_msgs::Float32MultiArray msg_x0;
+  for(int i = 0; i < NX; ++i) msg_x0.data.push_back(acadoVariables.x0[i]);
+  pub_x0.publish(msg_x0);
+
+  // 2. Publish Predicted Path (acadoVariables.x)
+  nav_msgs::Path pred_path;
+  pred_path.header.stamp = now;
+  pred_path.header.frame_id = "world";
+  for(int i = 0; i <= N; ++i) {
+    geometry_msgs::PoseStamped pose;
+    pose.header.stamp = now;
+    pose.header.frame_id = "world";
+    pose.pose.position.x = acadoVariables.x[i * NX + 0];
+    pose.pose.position.y = acadoVariables.x[i * NX + 1];
+    pose.pose.position.z = acadoVariables.x[i * NX + 2];
+    pose.pose.orientation.w = acadoVariables.x[i * NX + 3];
+    pose.pose.orientation.x = acadoVariables.x[i * NX + 4];
+    pose.pose.orientation.y = acadoVariables.x[i * NX + 5];
+    pose.pose.orientation.z = acadoVariables.x[i * NX + 6];
+    pred_path.poses.push_back(pose);
+  }
+  pub_pred_path.publish(pred_path);
+
+  // 3. Publish Reference Path (acadoVariables.y and yN)
+  nav_msgs::Path ref_path;
+  ref_path.header.stamp = now;
+  ref_path.header.frame_id = "world";
+  for(int i = 0; i < N; ++i) {
+    geometry_msgs::PoseStamped pose;
+    pose.header.stamp = now;
+    pose.header.frame_id = "world";
+    pose.pose.position.x = acadoVariables.y[i * NY + 0];
+    pose.pose.position.y = acadoVariables.y[i * NY + 1];
+    pose.pose.position.z = acadoVariables.y[i * NY + 2];
+    pose.pose.orientation.w = acadoVariables.y[i * NY + 3];
+    pose.pose.orientation.x = acadoVariables.y[i * NY + 4];
+    pose.pose.orientation.y = acadoVariables.y[i * NY + 5];
+    pose.pose.orientation.z = acadoVariables.y[i * NY + 6];
+    ref_path.poses.push_back(pose);
+  }
+  geometry_msgs::PoseStamped poseN;
+  poseN.header.stamp = now;
+  poseN.header.frame_id = "world";
+  poseN.pose.position.x = acadoVariables.yN[0];
+  poseN.pose.position.y = acadoVariables.yN[1];
+  poseN.pose.position.z = acadoVariables.yN[2];
+  poseN.pose.orientation.w = acadoVariables.yN[3];
+  poseN.pose.orientation.x = acadoVariables.yN[4];
+  poseN.pose.orientation.y = acadoVariables.yN[5];
+  poseN.pose.orientation.z = acadoVariables.yN[6];
+  ref_path.poses.push_back(poseN);
+  pub_ref_path.publish(ref_path);
+
+  // 4. Publish Predicted Controls (acadoVariables.u)
+  std_msgs::Float32MultiArray msg_u;
+  for(int i = 0; i < N * NU; ++i) msg_u.data.push_back(acadoVariables.u[i]);
+  pub_pred_u.publish(msg_u);
 }
 
 void MPCWrapper::updateState(nav_msgs::Odometry& msg)

@@ -7,6 +7,8 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/Int8.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
@@ -60,6 +62,9 @@ class MPCRos
     ros::ServiceClient arming_client, set_mode_client;  
     ros::Subscriber state_sub, odom_sub, goal_sub, traj_sub;  
     ros::Publisher cmd_pub;
+    ros::Publisher debug_mode_pub;
+    ros::Publisher debug_ref_pose_pub;
+    ros::Publisher debug_control_pub;
     
     MPCWrapper *wrapper;
 
