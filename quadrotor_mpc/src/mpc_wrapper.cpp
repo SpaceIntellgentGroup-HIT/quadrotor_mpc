@@ -142,7 +142,7 @@ void MPCWrapper::gerReference(const Eigen::MatrixXd& ref)
 
   for (int i = 0; i < NYN; ++i)
   {
-    acadoVariables.yN[ i ] = ref.col(N+1)[i];
+    acadoVariables.yN[ i ] = ref.col(N)[i];
   }  
 }
 
