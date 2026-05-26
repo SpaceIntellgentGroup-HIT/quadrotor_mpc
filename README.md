@@ -23,4 +23,8 @@
 
 `roslaunch traj_tools example1.launch`
 
+跑rviz需要发布坐标变换：
 
+`rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 world map`
+
+`rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 base_footprint base_link`
