@@ -16,6 +16,7 @@ MPCRos::MPCRos(ros::NodeHandle &nh):nh(nh)
 
   mpc_mode = AUTO_TAKEOFF;
   reference = Eigen::MatrixXd::Zero(Nreference, Ksample + 1);
+  thrust_estimator = new ThrustEstimator(hover_thrust, 9.8066);
 }
 
 MPCRos::~MPCRos()
@@ -29,6 +30,7 @@ void MPCRos::ExectControl()
   odom_sub = nh.subscribe<nav_msgs::Odometry> (odomTopicName, 1, &MPCRos::odom_Callback, this);
   state_sub = nh.subscribe<mavros_msgs::State> ("/mavros/state", 10, &MPCRos::state_Callback, this);
   traj_sub = nh.subscribe<quadrotor_msgs::mpc_ref_traj> ("/mpc_ref_traj", 1, &MPCRos::traj_Callback, this);
+  imu_sub = nh.subscribe<sensor_msgs::Imu> ("/mavros/imu/data", 10, &MPCRos::imu_Callback, this);
   cmd_pub = nh.advertise<mavros_msgs::AttitudeTarget> ("/mavros/setpoint_raw/attitude", 1);
   debug_mode_pub = nh.advertise<std_msgs::Int8>("/mpc_debug/mode", 1);
   debug_ref_pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/mpc_debug/ref_pose", 1);
@@ -188,6 +190,15 @@ void MPCRos::state_Callback(const mavros_msgs::State::ConstPtr& msg)
   current_state = *msg;
 }
 
+void MPCRos::imu_Callback(const sensor_msgs::Imu::ConstPtr& msg)
+{
+  //if (thrust_estimator)
+  bool updated = thrust_estimator->estimateThrustModel(msg->header.stamp.toSec(), msg->linear_acceleration.z);
+  if (updated)
+  {
+    hover_thrust = 9.8066 / thrust_estimator->getThr2Acc();
+  }
+}
 
 void MPCRos::traj_Callback(const quadrotor_msgs::mpc_ref_traj::ConstPtr& msg)
 {
@@ -335,8 +346,12 @@ void MPCRos::publishcontrol()
   ctrl_msg.data.push_back(control[2]); // wy
   ctrl_msg.data.push_back(control[3]); // wz
   debug_control_pub.publish(ctrl_msg);
-
-  double thrust = control[0] * hover_thrust / 9.8066;
+  //thrust = control[0] * hover_thrust / 9.8066;
+  double thrust = 0;
+  
+  thrust = thrust_estimator->computeDesiredThrust(control[0]);
+  thrust_estimator->pushThrustRecord(ros::Time::now().toSec(), thrust);
+  ROS_INFO_THROTTLE(1.0, "Thr2Acc: %f, estimated hover_thrust: %f", thrust_estimator->getThr2Acc(), 9.8066 / thrust_estimator->getThr2Acc());
 
   mavros_msgs::AttitudeTarget cmd;
   cmd.header.stamp = ros::Time::now();

@@ -1,4 +1,4 @@
-mass: 1.30
+mass: 1.30 #useless
 hover_thrust: 0.370184
 takeoff_height: 1.5
 ctrl_hz: 100

@@ -13,12 +13,14 @@
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
+#include <sensor_msgs/Imu.h>
 #include <quadrotor_msgs/mpc_ref_point.h>
 #include <quadrotor_msgs/mpc_ref_traj.h>
 // Eigen
 #include <Eigen/Eigen>
 // MPC Solver
 #include "uav_mpc/mpc_wrapper.h"
+#include "uav_mpc/thrust_estimator.h"
 
 #define Ksample    20
 #define Nreference 14
@@ -60,17 +62,19 @@ class MPCRos
 
     ros::Time last_request;
     ros::ServiceClient arming_client, set_mode_client;  
-    ros::Subscriber state_sub, odom_sub, goal_sub, traj_sub;  
+    ros::Subscriber state_sub, odom_sub, goal_sub, traj_sub, imu_sub;  
     ros::Publisher cmd_pub;
     ros::Publisher debug_mode_pub;
     ros::Publisher debug_ref_pose_pub;
     ros::Publisher debug_control_pub;
     
     MPCWrapper *wrapper;
+    ThrustEstimator *thrust_estimator;
 
     void state_Callback(const mavros_msgs::State::ConstPtr& msg);
     void odom_Callback(const nav_msgs::Odometry::ConstPtr& msg);
     void traj_Callback(const quadrotor_msgs::mpc_ref_traj::ConstPtr& msg);
+    void imu_Callback(const sensor_msgs::Imu::ConstPtr& msg);
 
     void FSMProcess();
     void getTrajRef();
