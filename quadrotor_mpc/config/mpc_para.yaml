@@ -1,6 +1,6 @@
 mass: 1.30 #useless
-hover_thrust: 0.370184
-takeoff_height: 1.5
+hover_thrust: 0.39
+takeoff_height: 0.8
 ctrl_hz: 100
 odomTopicName: /odom
 

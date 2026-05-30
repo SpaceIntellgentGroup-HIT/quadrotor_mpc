@@ -193,6 +193,11 @@ void MPCRos::state_Callback(const mavros_msgs::State::ConstPtr& msg)
 
 void MPCRos::imu_Callback(const sensor_msgs::Imu::ConstPtr& msg)
 {
+  // 增加安全逻辑：仅在飞机起桨且处于 OFFBOARD 模式时，才更新推力模型
+  if (!current_state.armed || current_state.mode != "OFFBOARD")
+  {
+    return;
+  }
   //if (thrust_estimator)
   bool updated = thrust_estimator->estimateThrustModel(msg->header.stamp.toSec(), msg->linear_acceleration.z);
   if (updated)
@@ -200,6 +205,7 @@ void MPCRos::imu_Callback(const sensor_msgs::Imu::ConstPtr& msg)
     //hover_thrust = 9.8066 / thrust_estimator->getThr2Acc();
   }
 }
+
 
 void MPCRos::traj_Callback(const quadrotor_msgs::mpc_ref_traj::ConstPtr& msg)
 {
@@ -350,15 +356,15 @@ void MPCRos::publishcontrol()
 
   double thrust = 0;
   //thrust = control[0] * hover_thrust / 9.8066;
-  thrust = control[0] * hover_thrust / 9.8066;
+  //thrust = control[0] * hover_thrust / 9.8066;
   std::cout<<"hov_thrust = 9.8066 / thrust_estimator->getThr2Acc() = "<<9.8066 / thrust_estimator->getThr2Acc()<<std::endl;
-  //thrust = thrust_estimator->computeDesiredThrust(control[0]);
+  thrust = thrust_estimator->computeDesiredThrust(control[0]);
   thrust_estimator->pushThrustRecord(ros::Time::now().toSec(), thrust);
   //ROS_INFO_THROTTLE(1.0, "Thr2Acc: %f, estimated hover_thrust: %f", thrust_estimator->getThr2Acc(), 9.8066 / thrust_estimator->getThr2Acc());
 
   // 4. Publish Estimated Hover Thrust
   std_msgs::Float64 hover_thrust_msg;
-  hover_thrust_msg.data = hover_thrust;
+  hover_thrust_msg.data = 9.8066 / thrust_estimator->getThr2Acc();
   debug_hover_thrust_pub.publish(hover_thrust_msg);
 
   mavros_msgs::AttitudeTarget cmd;
