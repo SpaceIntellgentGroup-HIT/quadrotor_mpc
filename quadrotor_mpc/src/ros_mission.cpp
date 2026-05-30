@@ -35,6 +35,7 @@ void MPCRos::ExectControl()
   debug_mode_pub = nh.advertise<std_msgs::Int8>("/mpc_debug/mode", 1);
   debug_ref_pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/mpc_debug/ref_pose", 1);
   debug_control_pub = nh.advertise<std_msgs::Float32MultiArray>("/mpc_debug/raw_control", 1);
+  debug_hover_thrust_pub = nh.advertise<std_msgs::Float64>("/mpc_debug/hover_thrust", 1);
 
   offb_set_mode.request.custom_mode = "OFFBOARD";
   arm_cmd.request.value = true;
@@ -346,15 +347,19 @@ void MPCRos::publishcontrol()
   ctrl_msg.data.push_back(control[2]); // wy
   ctrl_msg.data.push_back(control[3]); // wz
   debug_control_pub.publish(ctrl_msg);
-  //thrust = control[0] * hover_thrust / 9.8066;
+
   double thrust = 0;
-  
-  
+  //thrust = control[0] * hover_thrust / 9.8066;
   thrust = control[0] * hover_thrust / 9.8066;
   std::cout<<"hov_thrust = 9.8066 / thrust_estimator->getThr2Acc() = "<<9.8066 / thrust_estimator->getThr2Acc()<<std::endl;
   //thrust = thrust_estimator->computeDesiredThrust(control[0]);
   thrust_estimator->pushThrustRecord(ros::Time::now().toSec(), thrust);
   //ROS_INFO_THROTTLE(1.0, "Thr2Acc: %f, estimated hover_thrust: %f", thrust_estimator->getThr2Acc(), 9.8066 / thrust_estimator->getThr2Acc());
+
+  // 4. Publish Estimated Hover Thrust
+  std_msgs::Float64 hover_thrust_msg;
+  hover_thrust_msg.data = hover_thrust;
+  debug_hover_thrust_pub.publish(hover_thrust_msg);
 
   mavros_msgs::AttitudeTarget cmd;
   cmd.header.stamp = ros::Time::now();

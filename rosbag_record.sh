@@ -24,6 +24,7 @@ TOPICS=(
   /mpc_debug/acado_ref_path
   /mpc_debug/acado_pred_u
   /mpc_debug/acado_x0
+  /mpc_debug/hover_thrust
 )
 
 mkdir -p "${BAG_DIR}"
