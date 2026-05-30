@@ -81,7 +81,7 @@ void MPCRos::FSMProcess()
     if(mpc_init)
     {
       reference = Eigen::MatrixXd::Zero(Nreference, Ksample + 1);
-      ROS_INFO("mpc_mode: %d", mpc_mode);
+      //ROS_INFO("mpc_mode: %d", mpc_mode);
       switch(mpc_mode)
       {
         case AUTO_HOVER:
@@ -196,7 +196,7 @@ void MPCRos::imu_Callback(const sensor_msgs::Imu::ConstPtr& msg)
   bool updated = thrust_estimator->estimateThrustModel(msg->header.stamp.toSec(), msg->linear_acceleration.z);
   if (updated)
   {
-    hover_thrust = 9.8066 / thrust_estimator->getThr2Acc();
+    //hover_thrust = 9.8066 / thrust_estimator->getThr2Acc();
   }
 }
 
@@ -349,9 +349,12 @@ void MPCRos::publishcontrol()
   //thrust = control[0] * hover_thrust / 9.8066;
   double thrust = 0;
   
-  thrust = thrust_estimator->computeDesiredThrust(control[0]);
+  
+  thrust = control[0] * hover_thrust / 9.8066;
+  std::cout<<"hov_thrust = 9.8066 / thrust_estimator->getThr2Acc() = "<<9.8066 / thrust_estimator->getThr2Acc()<<std::endl;
+  //thrust = thrust_estimator->computeDesiredThrust(control[0]);
   thrust_estimator->pushThrustRecord(ros::Time::now().toSec(), thrust);
-  ROS_INFO_THROTTLE(1.0, "Thr2Acc: %f, estimated hover_thrust: %f", thrust_estimator->getThr2Acc(), 9.8066 / thrust_estimator->getThr2Acc());
+  //ROS_INFO_THROTTLE(1.0, "Thr2Acc: %f, estimated hover_thrust: %f", thrust_estimator->getThr2Acc(), 9.8066 / thrust_estimator->getThr2Acc());
 
   mavros_msgs::AttitudeTarget cmd;
   cmd.header.stamp = ros::Time::now();
