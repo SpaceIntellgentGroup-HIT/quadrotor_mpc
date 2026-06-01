@@ -127,10 +127,10 @@ int main(int argc, char **argv)
 
     d0 = d1 = 0.0;
     // route = routeGen.generate(3);
-    route = Eigen::MatrixXd::Zero(3, 4);
-    route << 0, 0, 2, 2,
-             0, 2, 2, 0,
-             1, 1, 1, 1;
+    route = Eigen::MatrixXd::Zero(3, 6);
+    route << 0, 0, 2, 2, 0, 0,
+             0, 2, 2, 0, 0, 0,
+             1, 1, 1, 1, 1, 0.3;
 
     iS.col(0) << route.leftCols<1>();
     fS.col(0) << route.rightCols<1>();
@@ -143,28 +143,28 @@ int main(int argc, char **argv)
     {
       tc0 = std::chrono::high_resolution_clock::now();
       jerkOpt.reset(iS, fS, route.cols() - 1);
-      jerkOpt.generate(route.block(0, 1, 3, 3 - 1), ts);
+      jerkOpt.generate(route.block(0, 1, 3, route.cols() - 2), ts);
       jerkOpt.getTraj(minJerkTraj);
       t_duration = minJerkTraj.getTotalDuration();
       tc1 = std::chrono::high_resolution_clock::now();
 
       d0 += std::chrono::duration_cast<std::chrono::duration<double>>(tc1 - tc0).count();
 
-      std::cout << "Piece Number: " << 2
+      std::cout << "Piece Number: " << route.cols() - 1
                 << " MinJerk Comp. Time: " << d0  << " s"<< std::endl;
     }
     else
     {
       tc1 = std::chrono::high_resolution_clock::now();
       snapOpt.reset(iSS, fSS, route.cols() - 1);
-      snapOpt.generate(route.block(0, 1, 3, 3 - 1), ts);
+      snapOpt.generate(route.block(0, 1, 3, route.cols() - 2), ts);
       snapOpt.getTraj(minSnapTraj);
       t_duration = minSnapTraj.getTotalDuration();
       tc2 = std::chrono::high_resolution_clock::now();
 
       d1 += std::chrono::duration_cast<std::chrono::duration<double>>(tc2 - tc1).count();
 
-      std::cout << "Piece Number: " << 2
+      std::cout << "Piece Number: " << route.cols() - 1
                 << " MinSnap Comp. Time: " << d1  << " s" << std::endl;
     }
 
@@ -222,9 +222,9 @@ int main(int argc, char **argv)
         mpc_traj.mpc_ref_points.push_back(mpc_point);
       }
 
-      mpc_traj.goal.x = 9;
+      mpc_traj.goal.x = 0;
       mpc_traj.goal.y = 0;
-      mpc_traj.goal.z = 3.5;
+      mpc_traj.goal.z = 0.3;
 
       mpc_ref_pub.publish(mpc_traj);
 
