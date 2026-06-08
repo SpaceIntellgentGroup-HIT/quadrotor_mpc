@@ -26,6 +26,9 @@
 
 如何录制rosbag：
 `bash src/quadrotor_mpc/rosbag_record.sh`
+如何播放rosbag并可视化：
+`rosbag play hover_debug_20260601_151022.bag`
+`rviz -d src/quadrotor_mpc_-main/bag_anal_v0.rviz`
 
 跑rviz需要发布坐标变换：
 
